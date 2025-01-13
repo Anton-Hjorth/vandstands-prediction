@@ -5,81 +5,85 @@ import numpy as np # type: ignore
 import tensorflow as tf # type: ignore
 from tensorflow import keras # type: ignore
 from tensorflow.keras import layers, models # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
 import pandas as pd
-from convert_csv import ydre_vandstande, indre_vandstande
+from convert_csv import ydre_vandstande, indre_vandstande, wather_data
 import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+
+tf.config.threading.set_intra_op_parallelism_threads(0)
+tf.config.threading.set_inter_op_parallelism_threads(0)
+
+def interpolate_nan(array):
+    for col in range(array.shape[1]):
+        valid_indices = ~np.isnan(array[:, col])
+        if valid_indices.any():
+            interp_func = interp1d(
+                np.where(valid_indices)[0], array[valid_indices, col], 
+                kind='linear', bounds_error=False, fill_value='extrapolate'
+            )
+            array[:, col] = interp_func(np.arange(len(array)))
+    return array
 
 
-# Example arrays
-array1 = np.array(indre_vandstande)  # Larger array
-array2 = np.array(ydre_vandstande)  # Smaller array
+df_indre = pd.DataFrame(indre_vandstande, columns=["Data1"])
+df_ydre = pd.DataFrame(ydre_vandstande, columns=["Data2"])
+df_weather = pd.DataFrame(wather_data, columns=["Wind Direction", "Wind Speed", "Gust Wind"])
 
-# Convert to pandas DataFrame for easier manipulation
-df1 = pd.DataFrame(array1, columns=["Data1"])
-df2 = pd.DataFrame(array2, columns=["Data2"])
+# Step 1: Find the minimum length between the arrays
+min_length = min(len(df_indre), len(df_ydre), len(df_weather))
 
-# Step 1: Truncate the larger array if exact matching is required
-min_length = min(len(df1), len(df2))
-df1_truncated = df1.iloc[:min_length]
-df2_truncated = df2.iloc[:min_length]
+# Step 2: Truncate all dataframes to the minimum length
+df_indre_truncated = df_indre.iloc[:min_length]
+df_ydre_truncated = df_ydre.iloc[:min_length]
+df_weather_truncated = df_weather.iloc[:min_length]
 
-print("Truncated Matching Arrays:")
-print(len(df1_truncated))
-print(len(df2_truncated))
-
-# Step 2: Interpolating smaller data to match larger array if continuity matters
+# Step 3: Interpolate the smaller data arrays to match the length of the larger array (df_indre)
 df2_interpolated = pd.DataFrame(
     np.interp(
-        np.linspace(0, len(df2) - 1, len(df1)),  # Target positions in df1 size
-        np.arange(len(df2)),  # Original positions in df2 size
-        df2["Data2"]  # Data values from df2
+        np.linspace(0, len(df_ydre_truncated) - 1, len(df_indre_truncated)),  # Target positions in df_indre size
+        np.arange(len(df_ydre_truncated)),  # Original positions in df_ydre size
+        df_ydre_truncated["Data2"]  # Data values from df_ydre
     ),
     columns=["Data2"]
 )
 
-# Save interpolated data to a text file
-#df2_interpolated.to_csv("df2_interpolated.txt", index=False, header=True, sep='\t')
+# Step 4: Interpolate weather data for each column to match the truncated array length
+interpolated_weather_values = []
+for col in df_weather_truncated.columns:
+    interpolated_weather_values.append(np.interp(
+        np.linspace(0, len(df_weather_truncated) - 1, len(df_indre_truncated)),
+        np.arange(len(df_weather_truncated)),
+        df_weather_truncated[col]
+    ))
 
-plt.figure(figsize=(10, 6))
+# Create a DataFrame for the interpolated weather data
+df_weather_interpolated = pd.DataFrame(np.column_stack(interpolated_weather_values), columns=df_weather.columns)
 
-# Plot Array1 (original larger data)
-plt.plot(df1.index, df1["Data1"], 'o-', label="Array1", markersize=1)  # Points and curve
+# Step 5: Combine both water heights data and weather data (as needed)
+df_water_interpolated = pd.concat([df_indre_truncated, df2_interpolated], axis=1)
 
-# Plot the interpolated version of Array2
-plt.plot(df2_interpolated.index, df2_interpolated["Data2"], 'x-', label="Interpolated Array2", markersize=1)  # Points and curve
+# Step 6: Convert to numpy array (final output for water heights)
+water_heights_array = df_water_interpolated.to_numpy()
+weather_data_array = df_weather_interpolated.to_numpy()
+# Output the final water heights array and the interpolated weather data
 
-# Title and labels
-plt.title("Point Plot with Curve of Array1 and Interpolated Array2")
-plt.xlabel("Index")
-plt.ylabel("Data Values")
+# print(water_heights_array)
+# print(weather_data_array)
 
-# Show legend
-plt.legend()
 
-# Show grid
-plt.grid(True)
+# Define the weather and water conditions
+wether = np.array(weather_data_array) # targets: [wether_directions, wether_wind_speeds, gust_wind] for each weather condition
+water_heights_array = np.array(water_heights_array) # Targets: [water_height_1, water_height_2] for each weather condition
 
-# Save the plot as PNG
-plt.savefig("array1_vs_interpolated_array2.png")
+water_heights_array = interpolate_nan(water_heights_array)
 
-# Define the weather conditions
-# targets: [wether_directions, wether_wind_speeds, gust_wind] for each weather condition
-wether = np.array([
-    [0, 9.2, 12.3],  # North
-    [90, 8.1, 12],  # East
-    [180, 9.3, 10.8],  # South
-    [270, 8.7, 10.7],  # West
-    [180, 8.4, 11.4],  # South
-])
+contains_nan1 = np.isnan(water_heights_array).any()
+contains_nan2 = np.isnan(wether).any()
+print("Contains NaN:", contains_nan1, contains_nan2)
 
-# Targets: [water_height_1, water_height_2] for each weather condition
-water_heights_array = np.array([
-    [1.0, 2.0],  # Sunny
-    [2.5, 3.1],  # Rainy
-    [1.8, 2.4],  # Sunny
-    [3.0, 3.8],  # Cloudy
-    [1.2, 1.8],  # Rainy
-])
+print(wether)
+print(water_heights_array)
 
 # Define the model
 model = models.Sequential([
@@ -90,13 +94,15 @@ model = models.Sequential([
 ])
 
 # Compile the model
-model.compile(optimizer='adam', loss='mean_squared_error')
+model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error') # try NAdam optimizer and thers https://www.geeksforgeeks.org/optimizers-in-tensorflow/
 # Train the model
-model.fit(wether, water_heights_array, epochs=100, verbose=0)
+model.fit(wether, water_heights_array, epochs=1, verbose=1)
 
 # Test the model with a new weather condition
-test_weather = np.array([[0, 9.2, 12.31]])  # Example: Predict water heights for "sunny" weather (weather condition 0)
+test_weather = np.array([[164.6, 4, 4.5], [164.6, 4, 4.5], [200, 10, 12]])  # Example: Predict water heights for weather conditions [wind direction, wind speed, gust wind]
 predicted_heights = model.predict(test_weather)
 
-print(f"Predicted water height 1: {predicted_heights[0][0]:.2f}")
-print(f"Predicted water height 2: {predicted_heights[0][1]:.2f}")
+for i, prediction in enumerate(predicted_heights):
+    print(f"Test Sample {i + 1}:")
+    print(f"Predicted water height 1: {prediction[0]:.2f}")
+    print(f"Predicted water height 2: {prediction[1]:.2f}")
