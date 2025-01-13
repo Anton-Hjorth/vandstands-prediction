@@ -9,6 +9,7 @@ import pandas as pd
 from convert_csv import ydre_vandstande, indre_vandstande
 import matplotlib.pyplot as plt
 
+
 # Example arrays
 array1 = np.array(indre_vandstande)  # Larger array
 array2 = np.array(ydre_vandstande)  # Smaller array
