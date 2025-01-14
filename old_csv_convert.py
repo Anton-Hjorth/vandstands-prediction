@@ -1,5 +1,4 @@
 import pandas as pd
-import time, datetime
 
 # File path to your CSV file
 file_path_indre_data = "./CSV-Data/38.05_Vandstand_Minut.csv"
@@ -43,32 +42,20 @@ indre_vandstande = []
 ydre_vandstande = []
 wather_data = []
 
-
-
-
 for entry in indre_data_array:
-    datetime_str = entry[0]
-    timestamp = time.mktime(datetime.datetime.strptime(datetime_str, "%d-%m-%Y %H:%M").timetuple())
-
-
     vandstand = entry[1]
-    indre_vandstande.append([timestamp,vandstand])
+    indre_vandstande.append(vandstand)
 
 #print('her starter den anden')
 for entry in ydre_data_array:
-    datetime_str = entry[0]
-    timestamp = time.mktime(datetime.datetime.strptime(datetime_str, "%d-%m-%Y %H:%M").timetuple())
-
     vandstand = entry[1]
-    ydre_vandstande.append([timestamp, vandstand])
+    ydre_vandstande.append(vandstand)
 
 for entry in weather_data_array:
-    datetime_str = entry[0]
-    timestamp = time.mktime(datetime.datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S").timetuple())
     wind_speed = entry[1]
     wind_direction = entry[2]
     gust_wind = entry[5]
-    wather_data.append([timestamp, wind_direction, wind_speed, gust_wind])
+    wather_data.append([wind_direction, wind_speed, gust_wind])
 
 # print(len(indre_vandstande))
 # print(len(ydre_vandstande))

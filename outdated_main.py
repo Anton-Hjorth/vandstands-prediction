@@ -5,9 +5,9 @@ import numpy as np # type: ignore
 import tensorflow as tf # type: ignore
 from tensorflow import keras # type: ignore
 from tensorflow.keras import layers, models # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.optimizers import Adam, Nadam # type: ignore
 import pandas as pd
-from convert_csv import ydre_vandstande, indre_vandstande, wather_data
+from old_csv_convert import ydre_vandstande, indre_vandstande, wather_data
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
@@ -94,12 +94,14 @@ model = models.Sequential([
 ])
 
 # Compile the model
-model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error') # try NAdam optimizer and thers https://www.geeksforgeeks.org/optimizers-in-tensorflow/
+model.compile(optimizer=Nadam(learning_rate=0.001), loss='mean_squared_error') # try NAdam optimizer and thers https://www.geeksforgeeks.org/optimizers-in-tensorflow/
 # Train the model
 model.fit(wether, water_heights_array, epochs=1, verbose=1)
 
+model.evaluate(wether, water_heights_array)
+
 # Test the model with a new weather condition
-test_weather = np.array([[164.6, 4, 4.5], [164.6, 4, 4.5], [200, 10, 12]])  # Example: Predict water heights for weather conditions [wind direction, wind speed, gust wind]
+test_weather = np.array([[164.6, 4, 4.5]])  # Example: Predict water heights for weather conditions [wind direction, wind speed, gust wind]
 predicted_heights = model.predict(test_weather)
 
 for i, prediction in enumerate(predicted_heights):
