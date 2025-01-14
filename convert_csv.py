@@ -44,15 +44,12 @@ ydre_vandstande = []
 wather_data = []
 
 
-
-
 for entry in indre_data_array:
     datetime_str = entry[0]
     timestamp = time.mktime(datetime.datetime.strptime(datetime_str, "%d-%m-%Y %H:%M").timetuple())
 
-
     vandstand = entry[1]
-    indre_vandstande.append([timestamp,vandstand])
+    indre_vandstande.append([timestamp, vandstand])
 
 #print('her starter den anden')
 for entry in ydre_data_array:
@@ -65,6 +62,7 @@ for entry in ydre_data_array:
 for entry in weather_data_array:
     datetime_str = entry[0]
     timestamp = time.mktime(datetime.datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S").timetuple())
+    
     wind_speed = entry[1]
     wind_direction = entry[2]
     gust_wind = entry[5]
