@@ -1,0 +1,2 @@
+# API key til DMI Bare brug den hvis du gider kan ikke selv få det til at virke
+API_KEY = "e318d53d-8ca4-47a9-b428-1eeb64536c7a"  

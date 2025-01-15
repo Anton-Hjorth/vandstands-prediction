@@ -1,35 +1,58 @@
-import os
-import datetime
-import IPython
-import IPython.display
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
+import requests
 import pandas as pd
-import seaborn as sns
-import tensorflow as tf
+import datetime as dt
 
-mpl.rcParams['figure.figsize'] = (8, 6)
-mpl.rcParams['axes.grid'] = False
+api_key = 'e318d53d-8ca4-47a9-b428-1eeb64536c7a'  # Insert your API key
+DMI_URL = 'https://dmigw.govcloud.dk/v2/metObs/collections/observation/items'
 
-zip_path = tf.keras.utils.get_file(
-    origin='https://storage.googleapis.com/tensorflow/tf-keras-datasets/jena_climate_2009_2016.csv.zip',
-    fname='jena_climate_2009_2016.csv.zip',
-    extract=True)
-csv_path, _ = os.path.splitext(zip_path)
+# Specify the desired start and end time
+start_time = pd.Timestamp(2019, 1, 1)
+end_time = pd.Timestamp(2025, 1, 15)
 
-df = pd.read_csv(csv_path)
-# Slice [start:stop:step], starting from index 5 take every 6th record.
-df = df[5::6]
+# Convert to ISO format with UTC time zone
+datetime_str = start_time.tz_localize('UTC').isoformat() + '/' + end_time.tz_localize('UTC').isoformat()
 
-date_time = pd.to_datetime(df.pop('Date Time'), format='%d.%m.%Y %H:%M:%S')
+# Station IDs and parameter IDs for precipitation (rain data)
+stationIds = ['06080'] # Esbjerg
+parameterIds = ['precip_dur_past10min']  # Regn pr 10 min
 
-plot_cols = ['T (degC)', 'p (mbar)', 'rho (g/m**3)']
-plot_features = df[plot_cols]
-plot_features.index = date_time
-_ = plot_features.plot(subplots=True)
+# Prepare query parameters
+params = {
+    'api-key': api_key,
+    'datetime': datetime_str,
+    'stationId': ','.join(stationIds),
+    'parameterId': ','.join(parameterIds),
+    'limit': '300000',  # max limit
+}
 
-plot_features = df[plot_cols][:480]
-plot_features.index = date_time[:480]
-_ = plot_features.plot(subplots=True)
+# Submit GET request with url and parameters
+response = requests.get(DMI_URL, params=params)
 
+if response.status_code == 200:
+    json_data = response.json()  # Extract JSON data
+    
+    # Normalize JSON to a DataFrame
+    df = pd.json_normalize(json_data['features'])
+
+    # Ensure 'time' column is in datetime format
+    df['time'] = pd.to_datetime(df['properties.observed'])
+
+    # Clean the DataFrame by renaming and selecting relevant columns
+    df = df[['time', 'properties.value', 'properties.stationId', 'properties.parameterId']]
+    df.columns = df.columns.str.replace('properties.', '')  # Clean up column names
+    
+    # Drop duplicates based on 'time' and 'value'
+    df = df.drop_duplicates(subset=['time', 'value'])
+
+    # Set appropriate index
+    df.set_index(['parameterId', 'stationId', 'time'], inplace=True)
+    
+    # Unstack the data to make it more readable
+    df = df['value'].unstack(['stationId', 'parameterId'])
+
+    # Write the DataFrame to a CSV file
+    df.to_csv('precipitation_data.csv')
+
+    print("Data has been written to 'precipitation_data.csv'")
+else:
+    print(f"Error: {response.status_code}")

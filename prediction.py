@@ -4,16 +4,12 @@ import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from convert_csv import indre_vandstande, ydre_vandstande
-
-def normalize(data, min_val, max_val):
-    return (data - min_val) / (max_val - min_val)
-
-def denormalize(data, min_val, max_val):
-    return data * (max_val - min_val) + min_val
+import matplotlib.pyplot as plt
 
 # Example arrays (input format)
 indre_måling = indre_vandstande
 ydre_måling = ydre_vandstande
+
 # Step 1: Convert to DataFrame
 # Convert the raw lists into pandas DataFrames for easier handling
 indre_df = pd.DataFrame(indre_måling, columns=["timestamp", "water_level_indre"])
@@ -47,8 +43,8 @@ min_level = merged_df[["water_level_indre", "water_level_ydre"]].min().min()
 max_level = merged_df[["water_level_indre", "water_level_ydre"]].max().max()
 
 # Normalize to the range [0, 1]
-merged_df["water_level_indre"] = normalize(merged_df["water_level_indre"], min_level, max_level)
-merged_df["water_level_ydre"] = normalize(merged_df["water_level_ydre"], min_level, max_level)
+merged_df["water_level_indre"] = (merged_df["water_level_indre"] - min_level) / (max_level - min_level)
+merged_df["water_level_ydre"] = (merged_df["water_level_ydre"] - min_level) / (max_level - min_level)
 
 # Step 5: Create sliding windows for time series input
 def create_sliding_windows(data, window_size, prediction_size):
@@ -68,6 +64,9 @@ X, y = create_sliding_windows(
 split = int(0.8 * len(X))
 X_train, X_test = X[:split], X[split:]
 y_train, y_test = y[:split], y[split:]
+
+# Get the corresponding timestamps for the test set
+timestamps = merged_df["timestamp"].values[split + window_size:]
 
 # Step 6: Build and train the TensorFlow model
 model = Sequential([
@@ -89,8 +88,23 @@ loss, mae = model.evaluate(X_test, y_test.reshape(-1, prediction_size * 2))
 print(f"Test Loss: {loss}, Test MAE: {mae}")
 
 predictions = model.predict(X_test).reshape(-1, prediction_size, 2)
-predictions_denorm = denormalize(predictions, min_level, max_level)
-for i, pred in enumerate(predictions[:5]):
-    print(f"Prediction {i+1}:")
-    print(f"  Indre: {pred[0][0]:.4f}")
-    print(f"  Ydre: {pred[0][1]:.4f}")
+predictions_denorm = predictions * (max_level - min_level) + min_level
+
+# Variable to control the number of predictions to display
+num_predictions = 300
+
+indre_stand = []
+ydre_stand = []
+for i, pred in enumerate(predictions_denorm[:num_predictions]):
+    indre_stand.append(pred[0][0])
+    ydre_stand.append(pred[0][1])
+
+# Step 8: Plot the Predictions with Timestamps
+plt.figure(figsize=(14, 7))
+plt.plot(timestamps[:num_predictions], indre_stand, label="Predicted Indre Water Level")
+plt.plot(timestamps[:num_predictions], ydre_stand, label="Predicted Ydre Water Level")
+plt.xlabel('Timestamp')
+plt.ylabel('Water Level')
+plt.title('Predicted Water Levels')
+plt.legend()
+plt.show()
