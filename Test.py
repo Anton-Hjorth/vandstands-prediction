@@ -1,37 +1,35 @@
+import os
+import datetime
+import IPython
+import IPython.display
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import tensorflow as tf
 
-# Example arrays
-array1 = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9])  # Larger array
-array2 = np.array([1, 3, 5, 7])  # Smaller array
+mpl.rcParams['figure.figsize'] = (8, 6)
+mpl.rcParams['axes.grid'] = False
 
-# Convert to pandas DataFrame for easier manipulation
-df1 = pd.DataFrame(array1, columns=["Data1"])
-df2 = pd.DataFrame(array2, columns=["Data2"])
+zip_path = tf.keras.utils.get_file(
+    origin='https://storage.googleapis.com/tensorflow/tf-keras-datasets/jena_climate_2009_2016.csv.zip',
+    fname='jena_climate_2009_2016.csv.zip',
+    extract=True)
+csv_path, _ = os.path.splitext(zip_path)
 
-# Step 1: Truncate the larger array if exact matching is required
-min_length = min(len(df1), len(df2))
-df1_truncated = df1.iloc[:min_length]
-df2_truncated = df2.iloc[:min_length]
+df = pd.read_csv(csv_path)
+# Slice [start:stop:step], starting from index 5 take every 6th record.
+df = df[5::6]
 
-print("Truncated Matching Arrays:")
-print(df1_truncated)
-print(df2_truncated)
+date_time = pd.to_datetime(df.pop('Date Time'), format='%d.%m.%Y %H:%M:%S')
 
-# Step 2: Interpolating smaller data to match larger array if continuity matters
-df2_interpolated = pd.DataFrame(
-    np.interp(
-        np.linspace(0, len(df2) - 1, len(df1)),  # Target positions in df1 size
-        np.arange(len(df2)),  # Original positions in df2 size
-        df2["Data2"]  # Data values from df2
-    ),
-    columns=["Data2"] 
-)
+plot_cols = ['T (degC)', 'p (mbar)', 'rho (g/m**3)']
+plot_features = df[plot_cols]
+plot_features.index = date_time
+_ = plot_features.plot(subplots=True)
 
-# Resetting the index for consistency
-df1.reset_index(drop=True, inplace=True)
-df2_interpolated.reset_index(drop=True, inplace=True)
+plot_features = df[plot_cols][:480]
+plot_features.index = date_time[:480]
+_ = plot_features.plot(subplots=True)
 
-print("\nInterpolated Matching Arrays:")
-print(df1)
-print(df2_interpolated)

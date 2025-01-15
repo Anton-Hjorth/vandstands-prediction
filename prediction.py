@@ -29,7 +29,7 @@ array2_interp = [[round(float(x), 2), round(float(y), 2)] for x, y in zip(y1_int
 
 #print(array2_interp)
 
-"""
+
 array2_interp_x = [item[0] for item in array2_interp]
 array2_interp_y = [item[1] for item in array2_interp]
 # Plot the interpolated array2
@@ -38,7 +38,7 @@ plt.xlabel('X values')
 plt.ylabel('Y values')
 plt.title('Interpolated Array 2')
 plt.legend()
-plt.show()"""
+plt.show()
 
 
 
