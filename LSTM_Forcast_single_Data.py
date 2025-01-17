@@ -33,6 +33,8 @@ csv_path = os.path.join(extracted_folder, "jena_climate_2009_2016.csv")  # CSV f
 df = pd.read_csv(csv_path)
 df = df[5::6]  # Subsample every 6th row
 
+print(df.head())
+
 df.index = pd.to_datetime(df['Date Time'], format='%d.%m.%Y %H:%M:%S')
 temp = df['T (degC)']
 
@@ -42,9 +44,9 @@ def df_to_X_y(df, window_size=5):
     y = []
 
     for i in range(len(df_as_np) - window_size):
-        row = [[a] for a in df_as_np[i:i + 5]]
+        row = [[a] for a in df_as_np[i:i + window_size]]
         X.append(row)
-        label = df_as_np[i + 5]
+        label = df_as_np[i + window_size]
         y.append(label)
     return np.array(X), np.array(y)
 
@@ -76,14 +78,14 @@ train_predictions = model1.predict(X_train).flatten()
 train_results = pd.DataFrame(data={'Train Predictions': train_predictions, 'Actuals': y_train})
 # print(train_results.head())
 
-# plt.figure(figsize=(14, 7))
-# plt.plot(train_results['Train Predictions'][50:100], label='Train Predictions' )
-# plt.plot(train_results['Actuals'][50:100], label='Actuals')
-# plt.xlabel('Index')
-# plt.ylabel('Value')
-# plt.title('Train Predictions vs Actuals')
-# plt.legend()
-# plt.show()
+plt.figure(figsize=(14, 7))
+plt.plot(train_results['Train Predictions'][50:100], label='Train Predictions' )
+plt.plot(train_results['Actuals'][50:100], label='Actuals')
+plt.xlabel('Index')
+plt.ylabel('Value')
+plt.title('Train Predictions vs Actuals')
+plt.legend()
+plt.show()
 
 val_predictions = model1.predict(X_val).flatten()
 val_results = pd.DataFrame(data={'Val Predictions': val_predictions, 'Actuals': y_val})
