@@ -110,7 +110,7 @@ future_predictions_df = pd.DataFrame(future_predictions, columns=['Timestamp', '
 future_predictions_df['Timestamp'] = future_predictions_df['Timestamp'].dt.strftime('%d-%m-%Y %H:%M')
 future_predictions_df['Water Level'] = future_predictions_df['Water Level'].round(2).astype(float)
 
-predictions(future_predictions_df)
+# predictions(future_predictions_df)
 print(future_predictions_df)
 
 
@@ -122,8 +122,7 @@ placeholder_dict = {
     "Timestamp4": "Waterlevel4",
     "Timestamp5": "Waterlevel5",
     "Timestamp6": "Waterlevel6",
-
-}
+    }
 json_placeholder_dict = json.dumps(placeholder_dict, indent=6)
 
 with open("data_for_api.json", "w") as outfile:
