@@ -11,6 +11,8 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import json
+
 from convert_csv import indre_vandstande, ydre_vandstande
 
 # sliceing ser sådan her ud [start:stop:step] vi bruger ikke stop
@@ -110,4 +112,22 @@ future_predictions_df['Water Level'] = future_predictions_df['Water Level'].roun
 
 predictions(future_predictions_df)
 print(future_predictions_df)
+
+
+#her skal future_predictions appendes, muligvis skæringspunkter, timestamps OG vandstand ved det timestamp
+placeholder_dict = {
+    "Timestamp1": "Waterlevel1",
+    "Timestamp2": "Waterlevel2",
+    "Timestamp3": "Waterlevel3",
+    "Timestamp4": "Waterlevel4",
+    "Timestamp5": "Waterlevel5",
+    "Timestamp6": "Waterlevel6",
+
+}
+json_placeholder_dict = json.dumps(placeholder_dict, indent=6)
+
+with open("data_for_api.json", "w") as outfile:
+    outfile.write(json_placeholder_dict)
+
+
 # predictions(indre_predictions)
