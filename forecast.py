@@ -82,7 +82,7 @@ def predictions(predictions_df):
 # indre_predictions = indre_model.predict(indre_X_test, verbose=1)[:prediction_size]
 # future_prediction_results = pd.DataFrame(data={'Train Predictions': indre_predictions})
 
-def predict_future(model, initial_window, window_size, steps_ahead):
+def predict_future(model, initial_window, window_size, steps_ahead, indre_df):
     predictions = []
 
     current_input = initial_window['Water Level'].to_numpy()
@@ -92,7 +92,7 @@ def predict_future(model, initial_window, window_size, steps_ahead):
         current_window = current_input[-window_size:].reshape(1, window_size, 1)
         predicted_value = model.predict(current_window)
             
-        current_input = np.roll(current_input, shift=-1)
+        current_input = np.roll(current_input, shift=1)
         current_input[-1] = predicted_value  # Insert the prediction into the last position
 
         incremented_date = pd.to_datetime(last_know_date, format='%d-%m-%Y %H:%M') + pd.Timedelta(minutes=30)
@@ -103,15 +103,17 @@ def predict_future(model, initial_window, window_size, steps_ahead):
     return np.array(predictions)
 
 initial_window = indre_df[-10:]
-steps_ahead = 50
+steps_ahead = 48
 
 future_predictions = predict_future(indre_model, initial_window, window_size=5, steps_ahead=steps_ahead)
 future_predictions_df = pd.DataFrame(future_predictions, columns=['Timestamp', 'Water Level'])
 future_predictions_df['Timestamp'] = future_predictions_df['Timestamp'].dt.strftime('%d-%m-%Y %H:%M')
 future_predictions_df['Water Level'] = future_predictions_df['Water Level'].round(2).astype(float)
 
-# predictions(future_predictions_df)
+predictions(future_predictions_df)
 print(future_predictions_df)
+
+
 
 
 #her skal future_predictions appendes, muligvis skæringspunkter, timestamps OG vandstand ved det timestamp

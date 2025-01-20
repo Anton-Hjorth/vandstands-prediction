@@ -1,15 +1,13 @@
 
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import InputLayer, LSTM, Dense, Conv1D, Flatten, GRU, Dropout
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.losses import MeanSquaredError
-from tensorflow.keras.metrics import RootMeanSquaredError
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import load_model
-from sklearn.metrics import mean_squared_error as mse
+from tensorflow.keras.models import Sequential # type: ignore
+from tensorflow.keras.layers import InputLayer, LSTM, Dense, Conv1D, Flatten, GRU, Dropout # type: ignore
+from tensorflow.keras.callbacks import ModelCheckpoint # type: ignore
+from tensorflow.keras.losses import MeanSquaredError # type: ignore
+from tensorflow.keras.metrics import RootMeanSquaredError # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.models import load_model # type: ignore
 import pandas as pd
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from convert_csv import indre_vandstande, ydre_vandstande
@@ -24,6 +22,14 @@ ydre_df.index = pd.to_datetime(ydre_df['Timestamp'], format='%d-%m-%Y %H:%M')
 
 indre_water_level = indre_df['Water Level']
 ydre_water_level = ydre_df['Water Level']
+
+# day = 60*60*24 # seconds
+# year = 365.2425*day # seconds/year
+# 
+# indre_df['Day sin'] = np.sin(indre_df['Seconds'] * (2* np.pi / day))
+# indre_df['Day cos'] = np.cos(indre_df['Seconds'] * (2 * np.pi / day))
+# indre_df['Year sin'] = np.sin(indre_df['Seconds'] * (2 * np.pi / year))
+# indre_df['Year cos'] = np.cos(indre_df['Seconds'] * (2 * np.pi / year))
 
 # df = fx indre_df eller ydre_df
 # window_size = 
@@ -88,17 +94,6 @@ ydre_model.add(Dense(1, activation='linear'))
 indre_model = load_model('Models/indre_model.keras')
 ydre_model = load_model('Models/ydre_model.keras')
 
-def plot_predictions(predictions):
-    plt.figure(figsize=(14, 7))
-    plt.plot(predictions['Test Predictions'][:100], label='Val Predictions' )
-    plt.plot(predictions['Actuals'][:100], label='Actuals')
-    plt.xlabel('Index')
-    plt.ylabel('Value')
-    plt.title('Test Predictions vs Actuals')
-    plt.legend()
-    plt.show()
-
-
 def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
     # Print column names for debugging
     print("Indre Predictions DataFrame columns:", indre_predictions_df.columns)
@@ -128,45 +123,7 @@ def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
     # Show the plot
     plt.tight_layout()
     plt.savefig('Predictions.png')
-    # plt.show()
-
-
-# indre_predictions = indre_model.predict(indre_X_test).flatten()
-# future_prediction_results = pd.DataFrame(data={'Test Predictions': indre_predictions, 'Actuals': indre_y_test})
-# plot_predictions(future_prediction_results)
-
-
-# def predict_future(model, initial_window, window_size, steps_ahead, indre_df):
-#     predictions = []
-# 
-#     current_input = initial_window['Water Level'].to_numpy()
-#     last_know_date = indre_df['Timestamp'].loc[indre_df.index[-1]] # Finder den aller sidste dato i indre_df 
-# 
-#     for _ in range(steps_ahead):
-#         current_window = current_input[-window_size:].reshape(1, window_size, 1)
-#         predicted_value = model.predict(current_window)
-#             
-#         current_input = np.roll(current_input, shift=1)
-#         current_input[-1] = predicted_value  # Insert the prediction into the last position
-# 
-#         incremented_date = pd.to_datetime(last_know_date, format='%d-%m-%Y %H:%M') + pd.Timedelta(minutes=30)
-#         last_know_date = incremented_date
-#         predictions.append([incremented_date, predicted_value[0][0]])
-#         # print(incremented_date)
-# 
-#     return np.array(predictions)
-
-# initial_window = indre_df[-10:]
-# steps_ahead = 48
-# 
-# future_predictions = predict_future(indre_model, initial_window, window_size=5, steps_ahead=steps_ahead)
-# future_predictions_df = pd.DataFrame(future_predictions, columns=['Timestamp', 'Water Level'])
-# future_predictions_df['Timestamp'] = future_predictions_df['Timestamp'].dt.strftime('%d-%m-%Y %H:%M')
-# future_predictions_df['Water Level'] = future_predictions_df['Water Level'].round(2).astype(float)
-# 
-# predictions(future_predictions_df)
-# print(future_predictions_df)
-# predictions(indre_predictions)
+    plt.show()
 
 
 def multi_step(step_size, batch_size, model, window_size, initial_window, df, learning_rate, epochs, frequency, amplitude, shift):
@@ -247,15 +204,21 @@ ydre_displacement = 0.5
 
 indre_frequency, indre_amplitude, indre_shift = 1.5, 0.4, 0.5
 ydre_frequency, ydre_amplitude, ydre_shift = 1.9, 2, 0.25
+# increase amplitude = increase height
+# decrease amplitude = decrease height
+# increase frequency = increase speed "tighter waves"
+# decrease frequency = decrease speed "wider waves"
 
 indre_df = multi_step(step_size, batch_size, indre_model, window_size, indre_initial_window, indre_df, learning_rate, epochs, indre_frequency, indre_amplitude, indre_shift)
 indre_df = indre_df.tail(batch_size*step_size)
 indre_df = indre_df.reset_index(level=[0]) 
 indre_array = indre_df[['Timestamp', 'Water Level']].values
-
+indre_df = indre_df.drop(columns=['index']) 
 
 ydre_df = multi_step(step_size, batch_size, ydre_model, window_size, ydre_initial_window, ydre_df, learning_rate, epochs, ydre_frequency, ydre_amplitude, ydre_shift)
 ydre_df = ydre_df.tail(batch_size*step_size)
 ydre_df = ydre_df.reset_index(level=[0]) 
 ydre_array = ydre_df[['Timestamp', 'Water Level']].values
+ydre_df = ydre_df.drop(columns=['index']) 
 
+predictions(indre_df, ydre_df)

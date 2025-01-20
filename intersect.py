@@ -52,4 +52,4 @@ intersection = get_intersection(0, 48, indre_array, ydre_array) # start, end lin
 
 # Create a dictionary with the intersection points
 intersection_dict = {timestamp: water_level for timestamp, water_level in intersection}
-# print(intersection_dict)
+print(intersection_dict)
