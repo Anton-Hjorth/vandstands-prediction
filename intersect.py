@@ -1,22 +1,18 @@
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from convert_csv import indre_vandstande, ydre_vandstande
-import pandas as pd
+from forcast import indre_array, ydre_array
 
-def get_intersection(start_line, end_line):
+def get_intersection(start_line, end_line, indre_array, ydre_array):
     # Extract water level data and timestamps
-    indre_levels = np.array(indre_vandstande["Water Level"])
-    ydre_levels = np.array(ydre_vandstande["Water Level"])
-    timestamps = pd.to_datetime(indre_vandstande["Timestamp"], format="%d-%m-%Y %H:%M")  # Assuming both have the same timestamps
+    indre_levels = indre_array[start_line:end_line, 1].astype(float)
+    ydre_levels = ydre_array[start_line:end_line, 1].astype(float)
+    timestamps = indre_array[start_line:end_line, 0]  # Assuming both have the same timestamps
 
-    # Ensure both arrays have the same length and select the desired range
-    indre_levels = indre_levels[start_line:end_line]
-    ydre_levels = ydre_levels[start_line:end_line]
-    timestamps = timestamps[start_line:end_line]
+    # Convert timestamps to datetime64 objects
+    x = np.array([np.datetime64(pd.to_datetime(ts, format="%d-%m-%Y %H:%M")) for ts in timestamps])
 
-    # Convert timestamps to numpy array
-    x = np.array(timestamps)
-
+    plt.figure(figsize=(10, 6))
     plt.plot(x, indre_levels, '-', label='Indre Vandstand')
     plt.plot(x, ydre_levels, '-', label='Ydre Vandstand')
 
@@ -37,19 +33,23 @@ def get_intersection(start_line, end_line):
             intersect_y_val = y1 + (y2 - y1) * (intersect_x_val - x1) / (x2 - x1)
             
             intersect_x.append(intersect_x_val)
-            intersect_y.append(intersect_y_val)
+            intersect_y.append(float(intersect_y_val))  # Convert np.float64 to Python float
 
     # Format the intersection points to include only the date and time
-    formatted_intersections = [pd.to_datetime(x_val).strftime('%Y-%m-%d %H:%M:%S') for x_val in intersect_x]
+    formatted_intersections = [(pd.to_datetime(x_val).strftime('%Y-%m-%d %H:%M'), y_val) for x_val, y_val in zip(intersect_x, intersect_y)]
     
-    """plt.plot(intersect_x, intersect_y, 'ro', label='Intersections')
+    plt.plot(intersect_x, intersect_y, 'ro', label='Intersections')
 
     plt.xlabel('Timestamp')
     plt.ylabel('Water Level')
     plt.legend()
-    plt.show()"""
+    plt.savefig("intersection.png")
+    # plt.show()
 
     return formatted_intersections
 
-intersection = get_intersection(0, 288) # start, end line from csv file "144 = half a day" "288 = a day"
-print(intersection) 
+intersection = get_intersection(0, 48, indre_array, ydre_array) # start, end line from csv file "144 = half a day" "288 = a day"
+
+# Create a dictionary with the intersection points
+intersection_dict = {timestamp: water_level for timestamp, water_level in intersection}
+# print(intersection_dict)

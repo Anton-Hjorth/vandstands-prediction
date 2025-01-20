@@ -128,7 +128,7 @@ def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
     # Show the plot
     plt.tight_layout()
     plt.savefig('Predictions.png')
-    plt.show()
+    # plt.show()
 
 
 # indre_predictions = indre_model.predict(indre_X_test).flatten()
@@ -169,7 +169,7 @@ def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
 # predictions(indre_predictions)
 
 
-def multi_step(step_size, batch_size, model, window_size, initial_window, df, learning_rate, epochs, shift):
+def multi_step(step_size, batch_size, model, window_size, initial_window, df, learning_rate, epochs, frequency, amplitude, shift):
     def train_model(model, X_train, y_train, X_val, y_val, learning_rate, epochs):
         model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=learning_rate), metrics=[RootMeanSquaredError()])
         model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs)
@@ -201,10 +201,10 @@ def multi_step(step_size, batch_size, model, window_size, initial_window, df, le
 
         return np.array(predictions)
     
-    frequency, amplitude = 1.5, 0.4 # amplitude = height frequency = speed/oscillation
+     # amplitude = height frequency = speed/oscillation
 
     df = df.copy()  # Ensure it's a new DataFrame
-    df.loc[:, 'Sin_Feature'] = np.sin(np.linspace(0, 2 * np.pi * frequency, len(df))) + 0.5
+    df.loc[:, 'Sin_Feature'] = np.sin(np.linspace(0, 2 * np.pi * frequency, len(df))) + shift
     df.loc[:, 'Water Level'] += amplitude * df['Sin_Feature']
 
     water_level = df['Water Level']
@@ -225,12 +225,16 @@ def multi_step(step_size, batch_size, model, window_size, initial_window, df, le
         future_predictions_df = future_predictions_df[['Timestamp', 'Water Level']]
         df = df[['Timestamp', 'Water Level']]
 
-        frames = [df, future_predictions_df]
-        df = pd.concat(frames, ignore_index=True)
+        # print("future predictions", future_predictions_df.head())
+
+        df = pd.concat([df[['Timestamp', 'Water Level']], future_predictions_df[['Timestamp', 'Water Level']]], ignore_index=True)
         initial_window = df[-10**i:]
         print(f"Process {i}/{batch_size}")
 
-    return df
+    print("Final df:\n", df.head())
+    print("Final df columns:", df.columns)
+    print("Final df types:\n", df.dtypes)
+    return df.reset_index(drop=True)
 
 step_size = 48 # 1
 batch_size = 1 # 48
@@ -241,11 +245,17 @@ epochs = 1
 indre_displacement = 0.5
 ydre_displacement = 0.5
 
+indre_frequency, indre_amplitude, indre_shift = 1.5, 0.4, 0.5
+ydre_frequency, ydre_amplitude, ydre_shift = 1.9, 2, 0.25
 
-indre_df = multi_step(step_size, batch_size, indre_model, window_size, indre_initial_window, indre_df, learning_rate, epochs, indre_displacement)
+indre_df = multi_step(step_size, batch_size, indre_model, window_size, indre_initial_window, indre_df, learning_rate, epochs, indre_frequency, indre_amplitude, indre_shift)
 indre_df = indre_df.tail(batch_size*step_size)
+indre_df = indre_df.reset_index(level=[0]) 
+indre_array = indre_df[['Timestamp', 'Water Level']].values
 
-ydre_df = multi_step(step_size, batch_size, ydre_model, window_size, ydre_initial_window, ydre_df, learning_rate, epochs, ydre_displacement)
+
+ydre_df = multi_step(step_size, batch_size, ydre_model, window_size, ydre_initial_window, ydre_df, learning_rate, epochs, ydre_frequency, ydre_amplitude, ydre_shift)
 ydre_df = ydre_df.tail(batch_size*step_size)
+ydre_df = ydre_df.reset_index(level=[0]) 
+ydre_array = ydre_df[['Timestamp', 'Water Level']].values
 
-predictions(indre_df, ydre_df)
