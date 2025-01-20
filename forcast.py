@@ -1,3 +1,4 @@
+
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import InputLayer, LSTM, Dense, Conv1D, Flatten, GRU, Dropout
@@ -8,6 +9,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import load_model
 from sklearn.metrics import mean_squared_error as mse
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from convert_csv import indre_vandstande, ydre_vandstande
@@ -125,6 +127,7 @@ def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
     
     # Show the plot
     plt.tight_layout()
+    plt.savefig('Predictions.png')
     plt.show()
 
 
@@ -166,7 +169,7 @@ def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
 # predictions(indre_predictions)
 
 
-def multi_step(step_size, batch_size, model, window_size, initial_window, df, learning_rate, epochs):
+def multi_step(step_size, batch_size, model, window_size, initial_window, df, learning_rate, epochs, shift):
     def train_model(model, X_train, y_train, X_val, y_val, learning_rate, epochs):
         model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=learning_rate), metrics=[RootMeanSquaredError()])
         model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs)
@@ -235,11 +238,14 @@ indre_initial_window = indre_df[-10:]
 ydre_initial_window = ydre_df[-10:]
 learning_rate = 0.001
 epochs = 1
+indre_displacement = 0.5
+ydre_displacement = 0.5
 
-indre_df = multi_step(step_size, batch_size, indre_model, window_size, indre_initial_window, indre_df, learning_rate, epochs)
+
+indre_df = multi_step(step_size, batch_size, indre_model, window_size, indre_initial_window, indre_df, learning_rate, epochs, indre_displacement)
 indre_df = indre_df.tail(batch_size*step_size)
 
-ydre_df = multi_step(step_size, batch_size, ydre_model, window_size, ydre_initial_window, ydre_df, learning_rate, epochs)
+ydre_df = multi_step(step_size, batch_size, ydre_model, window_size, ydre_initial_window, ydre_df, learning_rate, epochs, ydre_displacement)
 ydre_df = ydre_df.tail(batch_size*step_size)
 
 predictions(indre_df, ydre_df)
