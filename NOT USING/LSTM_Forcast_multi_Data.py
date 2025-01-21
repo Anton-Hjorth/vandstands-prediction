@@ -168,8 +168,8 @@ def preprocess_X(X):
     return X
 
 # print(preprocess_X(X2_train))
-# print(preprocess_X(X2_val))
-# print(preprocess_X(X2_test))
+# print(preprocess_X(X2_val))  
+# print(preprocess_X(X2_test)) 
 
 model4 = Sequential()
 model4.add(InputLayer((6, 5)))

@@ -57,6 +57,8 @@ indre_model.add(Dense(1, 'linear'))
 
 indre_model = load_model('Models/indre_model.keras')
 
+print(indre_df.columns)
+
 def plot_predictions(predictions):
     plt.figure(figsize=(14, 7))
     plt.plot(predictions['Train Predictions'][50:100], label='Train Predictions' )
