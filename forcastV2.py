@@ -1,67 +1,52 @@
-import tensorflow as tf
-from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import InputLayer, LSTM, Dense, Conv1D, Flatten, GRU, Dropout # type: ignore
-from tensorflow.keras.callbacks import ModelCheckpoint # type: ignore
-from tensorflow.keras.losses import MeanSquaredError # type: ignore
 from tensorflow.keras.metrics import RootMeanSquaredError # type: ignore
 from tensorflow.keras.optimizers import Adam # type: ignore
-from tensorflow.keras.models import load_model # type: ignore
-from tensorflow.keras.layers import TimeDistributed # type: ignore
+from tensorflow.keras.models import Sequential, load_model # type: ignore
+from tensorflow.keras.layers import LSTM, Dense, InputLayer # type: ignore
+from tensorflow.keras.callbacks import ModelCheckpoint # type: ignore
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from convert_csv import indre_vandstande, ydre_vandstande
-from matplotlib.ticker import MaxNLocator
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error as mse
+from tensorflow.keras.layers import Reshape
 
-def plot_predictions1(model, x, y, start=0, end=100):
-    predictions = model.predict(x).flatten()
-    y = y.flatten()  # Flatten the actual values
-    df = pd.DataFrame(data={'Predictions': predictions, 'Actuals': y})
-    plt.plot(df['Predictions'][start:end])
-    plt.plot(df['Actuals'][start:end])
-    plt.xlabel('Index')
-    plt.ylabel('Value')
-    plt.savefig('PredictionsV2.png')
-    #plt.show()
-    return df, mse(y, predictions)
+# Resample data to every 30 minutes
+indre_df = indre_vandstande[0::6]
+ydre_df = ydre_vandstande[0::3]
 
-# sliceing ser sådan her ud [start:stop:step] vi bruger ikke stop
-indre_df = indre_vandstande[0::6] # data for hvert 30. minut 
-ydre_df = ydre_vandstande[0::3] # data for hvert 30. minut
-
+# Convert timestamps
 indre_df.index = pd.to_datetime(indre_df['Timestamp'], format='%d-%m-%Y %H:%M')
 ydre_df.index = pd.to_datetime(ydre_df['Timestamp'], format='%d-%m-%Y %H:%M')
 
-indre_water_level = indre_df['Water Level']
-ydre_water_level = ydre_df['Water Level']
+# Extract water levels
+indre_df = indre_df[['Water Level']]
+ydre_df = ydre_df[['Water Level']]
 
-indre_df = pd.DataFrame({'Water Level': indre_water_level})
-indre_df['Seconds'] = indre_df.index.map(pd.Timestamp.timestamp)
+# Normalize water levels
+scaler_indre = MinMaxScaler()
+scaler_ydre = MinMaxScaler()
 
-ydre_df = pd.DataFrame({'Water Level': ydre_water_level})
-ydre_df['Seconds'] = ydre_df.index.map(pd.Timestamp.timestamp)
+indre_df['Water Level'] = scaler_indre.fit_transform(indre_df[['Water Level']])
+ydre_df['Water Level'] = scaler_ydre.fit_transform(ydre_df[['Water Level']])
 
-indre_df['Timestamp'] = indre_df.index # enssure that timestamp is part of the data frame
-ydre_df['Timestamp'] = ydre_df.index
+# Add timestamp-based sin/cos features
+day = 60*60*24  # Seconds in a day
+year = 365.2425 * day  # Seconds in a year
 
+timestamps = indre_df.index.map(pd.Timestamp.timestamp)
+indre_df['Day sin'] = np.sin(timestamps * (2 * np.pi / day))
+indre_df['Day cos'] = np.cos(timestamps * (2 * np.pi / day))
+indre_df['Year sin'] = np.sin(timestamps * (2 * np.pi / year))
+indre_df['Year cos'] = np.cos(timestamps * (2 * np.pi / year))
 
-day = 60*60*24 # seconds
-year = 365.2425*day # seconds/year
+timestamps = ydre_df.index.map(pd.Timestamp.timestamp)
+ydre_df['Day sin'] = np.sin(timestamps * (2 * np.pi / day))
+ydre_df['Day cos'] = np.cos(timestamps * (2 * np.pi / day))
+ydre_df['Year sin'] = np.sin(timestamps * (2 * np.pi / year))
+ydre_df['Year cos'] = np.cos(timestamps * (2 * np.pi / year))
 
-indre_df['Day sin'] = np.sin(indre_df['Water Level'] * (2 * np.pi / day))
-indre_df['Day cos'] = np.cos(indre_df['Water Level'] * (2 * np.pi / day))
-indre_df['Year sin'] = np.sin(indre_df['Water Level'] * (2 * np.pi / year))
-indre_df['Year cos'] = np.cos(indre_df['Water Level'] * (2 * np.pi / year))
-
-ydre_df['Day sin'] = np.sin(ydre_df['Water Level'] * (2* np.pi / day))
-ydre_df['Day cos'] = np.cos(ydre_df['Water Level'] * (2 * np.pi / day))
-ydre_df['Year sin'] = np.sin(ydre_df['Water Level'] * (2 * np.pi / year))
-ydre_df['Year cos'] = np.cos(ydre_df['Water Level'] * (2 * np.pi / year))
-
-indre_df = indre_df.drop('Seconds', axis=1)
-ydre_df = ydre_df.drop('Seconds', axis=1)
-
+# Convert DataFrame to LSTM format
 def df_to_X_y(df, window_size, future_steps):
     df_as_np = df.to_numpy()
     X, y = [], []
@@ -72,12 +57,14 @@ def df_to_X_y(df, window_size, future_steps):
 
     return np.array(X), np.array(y)
 
-window_size = 1  # Number of previous time steps to consider
-future_steps = 48  # Number of future time steps to predict
+window_size = 10  # Past time steps
+future_steps = 48  # Future time steps
+num_features = 5 
 
-indre_X, indre_y = df_to_X_y(indre_water_level, window_size, future_steps)
-ydre_X, ydre_y = df_to_X_y(ydre_water_level, window_size, future_steps)
+indre_X, indre_y = df_to_X_y(indre_df, window_size, future_steps)
+ydre_X, ydre_y = df_to_X_y(ydre_df, window_size, future_steps)
 
+# Split into train/val/test sets
 indre_X_train, indre_y_train = indre_X[:60000], indre_y[:60000]
 indre_X_val, indre_y_val = indre_X[60000:70000], indre_y[60000:70000]
 indre_X_test, indre_y_test = indre_X[100000:], indre_y[100000:]
@@ -86,63 +73,68 @@ ydre_X_train, ydre_y_train = ydre_X[:60000], ydre_y[:60000]
 ydre_X_val, ydre_y_val = ydre_X[60000:70000], ydre_y[60000:70000]
 ydre_X_test, ydre_y_test = ydre_X[100000:], ydre_y[100000:]
 
-indre_model = Sequential([
-    InputLayer((window_size, 1)),  # Input shape (7 time steps, 1 feature)
-    LSTM(64, return_sequences=True),
-    LSTM(32, return_sequences=False),
-    Dense(128, activation='relu'),
-    Dense(future_steps, activation='linear')  # Output 48 future steps
-])
+# Define LSTM Model
+def build_model():
+    model = Sequential([
+        LSTM(64, activation='relu', return_sequences=True, input_shape=(window_size, num_features)),
+        LSTM(32, activation='relu', return_sequences=False),
+        Dense(future_steps * num_features, activation='linear'),
+        Reshape((future_steps, num_features))
+    ])
+    model.compile(loss='mse', optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
+    return model
 
-ydre_model = Sequential([
-    InputLayer((window_size, 1)),
-    LSTM(64, return_sequences=True),
-    LSTM(32, return_sequences=False),
-    Dense(128, activation='relu'),
-    Dense(future_steps, activation='linear')
-])
-
-print(indre_model.summary())
-print(ydre_model.summary())
-
+# Train Indre Model
+indre_model = build_model()
 indre_model_CP = ModelCheckpoint('Models/indre_modelV2.keras', save_best_only=True)
-indre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
-indre_model.fit(indre_X_train, indre_y_train, validation_data=(indre_X_val, indre_y_val), epochs=1, callbacks=[indre_model_CP])
+indre_model.fit(indre_X_train, indre_y_train, validation_data=(indre_X_val, indre_y_val), epochs=2, callbacks=[indre_model_CP])
 
+# Train Ydre Model
+ydre_model = build_model()
 ydre_model_CP = ModelCheckpoint('Models/ydre_modelV2.keras', save_best_only=True)
-ydre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
-ydre_model.fit(ydre_X_train, ydre_y_train, validation_data=(ydre_X_val, ydre_y_val), epochs=1, callbacks=[ydre_model_CP])
+ydre_model.fit(ydre_X_train, ydre_y_train, validation_data=(ydre_X_val, ydre_y_val), epochs=2, callbacks=[ydre_model_CP])
 
+# Load best models
 indre_model = load_model('Models/indre_modelV2.keras')
 ydre_model = load_model('Models/ydre_modelV2.keras')
 
-indre_future_predictions = indre_model.predict(indre_X_test[:1])  # Predict next 48 values
-ydre_future_predictions = ydre_model.predict(ydre_X_test[:1])  # Predict next 48 values
+# Make Predictions
+indre_future_predictions = indre_model.predict(indre_X_test[:1])
+ydre_future_predictions = ydre_model.predict(ydre_X_test[:1])
 
-# Add 0.5 to each value of the indre future predictions
-indre_future_predictions += 0.5
+# Inverse transform predictions to original scale
+indre_future_predictions = scaler_indre.inverse_transform(indre_future_predictions.reshape(-1, 1)).flatten()
+ydre_future_predictions = scaler_ydre.inverse_transform(ydre_future_predictions.reshape(-1, 1)).flatten()
 
-print(indre_future_predictions)
-print(ydre_future_predictions)
+# Make predictions
+indre_input_data = indre_X_test[-1:]  # Use last test sample
+ydre_input_data = ydre_X_test[-1:]
+
+indre_future_predictions = indre_model.predict(indre_input_data)
+ydre_future_predictions = ydre_model.predict(ydre_input_data)
+
+indre_future_predictions = indre_future_predictions.reshape(-1, indre_future_predictions.shape[-1])  # Flatten time steps
+ydre_future_predictions = ydre_future_predictions.reshape(-1, ydre_future_predictions.shape[-1]) 
+
+# Plot each feature separately
+for i in range(indre_future_predictions.shape[1]):  # Iterate over the number of features
+    plt.plot(indre_future_predictions[:, i], label=f'Feature {i + 1}')
+
+# Plot each feature separately
+for i in range(ydre_future_predictions.shape[1]):  # Iterate over the number of features
+    plt.plot(ydre_future_predictions[:, i], label=f'Feature {i + 1}')
 
 # Plot the predictions
 plt.figure(figsize=(14, 7))
-
-# Plot Indre predictions
-plt.plot(indre_future_predictions.flatten(), label='Indre Future Predictions', color='blue')
-
-# Plot Ydre predictions
-plt.plot(ydre_future_predictions.flatten(), label='Ydre Future Predictions', color='red')
-
-# Set labels and title
+plt.plot(indre_future_predictions, label='Indre Future Predictions', color='blue')
+plt.plot(ydre_future_predictions, label='Ydre Future Predictions', color='red')
 plt.xlabel('Time Steps')
 plt.ylabel('Predicted Values')
 plt.title('Indre vs Ydre Future Predictions')
 plt.legend()
-
-# Show the plot
 plt.tight_layout()
 plt.savefig('PredictionsV2.png')
+plt.show()
 # plt.show()
 
 """
