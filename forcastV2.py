@@ -16,12 +16,14 @@ from sklearn.metrics import mean_squared_error as mse
 
 def plot_predictions1(model, x, y, start=0, end=100):
     predictions = model.predict(x).flatten()
+    y = y.flatten()  # Flatten the actual values
     df = pd.DataFrame(data={'Predictions': predictions, 'Actuals': y})
     plt.plot(df['Predictions'][start:end])
     plt.plot(df['Actuals'][start:end])
     plt.xlabel('Index')
     plt.ylabel('Value')
-    plt.show()
+    plt.savefig('PredictionsV2.png')
+    #plt.show()
     return df, mse(y, predictions)
 
 # sliceing ser sådan her ud [start:stop:step] vi bruger ikke stop
@@ -47,7 +49,7 @@ ydre_df['Timestamp'] = ydre_df.index
 day = 60*60*24 # seconds
 year = 365.2425*day # seconds/year
 
-indre_df['Day sin'] = np.sin(indre_df['Water Level'] * (2* np.pi / day))
+indre_df['Day sin'] = np.sin(indre_df['Water Level'] * (2 * np.pi / day))
 indre_df['Day cos'] = np.cos(indre_df['Water Level'] * (2 * np.pi / day))
 indre_df['Year sin'] = np.sin(indre_df['Water Level'] * (2 * np.pi / year))
 indre_df['Year cos'] = np.cos(indre_df['Water Level'] * (2 * np.pi / year))
@@ -56,8 +58,6 @@ ydre_df['Day sin'] = np.sin(ydre_df['Water Level'] * (2* np.pi / day))
 ydre_df['Day cos'] = np.cos(ydre_df['Water Level'] * (2 * np.pi / day))
 ydre_df['Year sin'] = np.sin(ydre_df['Water Level'] * (2 * np.pi / year))
 ydre_df['Year cos'] = np.cos(ydre_df['Water Level'] * (2 * np.pi / year))
-
-
 
 indre_df = indre_df.drop('Seconds', axis=1)
 ydre_df = ydre_df.drop('Seconds', axis=1)
@@ -72,26 +72,19 @@ def df_to_X_y(df, window_size, future_steps):
 
     return np.array(X), np.array(y)
 
-window_size = 10  # Number of previous time steps to consider
+window_size = 1  # Number of previous time steps to consider
 future_steps = 48  # Number of future time steps to predict
 
 indre_X, indre_y = df_to_X_y(indre_water_level, window_size, future_steps)
 ydre_X, ydre_y = df_to_X_y(ydre_water_level, window_size, future_steps)
 
 indre_X_train, indre_y_train = indre_X[:60000], indre_y[:60000]
-indre_X_val, indre_y_val = indre_X[60000:80000], indre_y[60000:80000]
+indre_X_val, indre_y_val = indre_X[60000:70000], indre_y[60000:70000]
 indre_X_test, indre_y_test = indre_X[100000:], indre_y[100000:]
 
 ydre_X_train, ydre_y_train = ydre_X[:60000], ydre_y[:60000]
-ydre_X_val, ydre_y_val = ydre_X[60000:80000], ydre_y[60000:80000]
+ydre_X_val, ydre_y_val = ydre_X[60000:70000], ydre_y[60000:70000]
 ydre_X_test, ydre_y_test = ydre_X[100000:], ydre_y[100000:]
-
-# indre_train_mean = np.mean(indre_X_train[:, :, 0])
-# indre_train_std = np.std(indre_X_train[:, :, 0])
-# 
-# def preprocess_X(X):
-#     X[:, :, 0] = (X[:, :, 0] - indre_train_mean) / indre_train_std
-#     return X
 
 indre_model = Sequential([
     InputLayer((window_size, 1)),  # Input shape (7 time steps, 1 feature)
@@ -112,25 +105,25 @@ ydre_model = Sequential([
 print(indre_model.summary())
 print(ydre_model.summary())
 
-#indre_model_CP = ModelCheckpoint('Models/indre_modelV2.keras', save_best_only=True)
-#indre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
-#indre_model.fit(indre_X_train, indre_y_train, validation_data=(indre_X_val, indre_y_val), epochs=10, callbacks=[indre_model_CP])
+indre_model_CP = ModelCheckpoint('Models/indre_modelV2.keras', save_best_only=True)
+indre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
+indre_model.fit(indre_X_train, indre_y_train, validation_data=(indre_X_val, indre_y_val), epochs=1, callbacks=[indre_model_CP])
 
-#ydre_model_CP = ModelCheckpoint('Models/ydre_modelV2.keras', save_best_only=True)
-#ydre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
-#ydre_model.fit(ydre_X_train, ydre_y_train, validation_data=(ydre_X_val, ydre_y_val), epochs=10, callbacks=[ydre_model_CP])
+ydre_model_CP = ModelCheckpoint('Models/ydre_modelV2.keras', save_best_only=True)
+ydre_model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.001), metrics=[RootMeanSquaredError()])
+ydre_model.fit(ydre_X_train, ydre_y_train, validation_data=(ydre_X_val, ydre_y_val), epochs=1, callbacks=[ydre_model_CP])
 
 indre_model = load_model('Models/indre_modelV2.keras')
 ydre_model = load_model('Models/ydre_modelV2.keras')
 
-plot_predictions1(indre_model, indre_X_test, indre_y_test, start=0, end=100)
-
 indre_future_predictions = indre_model.predict(indre_X_test[:1])  # Predict next 48 values
 ydre_future_predictions = ydre_model.predict(ydre_X_test[:1])  # Predict next 48 values
 
+# Add 0.5 to each value of the indre future predictions
+indre_future_predictions += 0.5
+
 print(indre_future_predictions)
 print(ydre_future_predictions)
-
 
 # Plot the predictions
 plt.figure(figsize=(14, 7))
@@ -149,8 +142,8 @@ plt.legend()
 
 # Show the plot
 plt.tight_layout()
-plt.show()
-
+plt.savefig('PredictionsV2.png')
+# plt.show()
 
 """
 def predictions(indre_predictions_df, ydre_predictions_df, max_xticks=10):
